@@ -1,0 +1,64 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      target: development
+    container_name: ledgerflow_app
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/ledgerflow
+      JWT_SECRET: ledgerflow_super_secret_jwt_key_2024
+      JWT_EXPIRES_IN: 7d
+      REDIS_URL: redis://redis:6379
+      MOBIWAVE_API_URL: ${MOBIWAVE_API_URL}
+      MOBIWAVE_API_TOKEN: ${MOBIWAVE_API_TOKEN}
+      MOBIWAVE_SENDER_ID: ${MOBIWAVE_SENDER_ID}
+      SMS_ENABLED: ${SMS_ENABLED}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: ledgerflow_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ledgerflow
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ledgerflow_redis
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
